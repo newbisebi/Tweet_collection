@@ -34,11 +34,10 @@ class AuthTwitter:
         """
         self.api_codes = api_codes
 
-    def code_file_param(self,args):
+    def code_file_param(self, args):
         """
         Read api keys passed as parameters
         """
-        
         self.api_codes = args.twittercodes.split(',')
 
     def open_codes_file(self, args):

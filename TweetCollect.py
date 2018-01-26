@@ -15,42 +15,42 @@ session, Base = SqlaSession.main()
 
 
 class KEYWORDS(Base):
-	"""
-	Sqlite table to store research keys
-	"""
-	__tablename__ = u'keywords'
-	key = Column(String, primary_key =True)
-	nb_query = Column(Integer)
+    """
+    Sqlite table to store research keys
+    """
+    __tablename__ = u'keywords'
+    key = Column(String, primary_key =True)
+    nb_query = Column(Integer)
 
-	def __init__(self):
-		self.nb_query = 0
+    def __init__(self):
+        self.nb_query = 0
 
-	def add_keys(session=s, keywords = [], hashtags=[]):
-		"""
-	    Ajoute des mots clés à rechercher
-		"""
-		for h in hashtags:
-			h = h.replace("#","")
-			h = "%23"+h
-			keywords.append(h)
-	        
-		for k in keywords:
-			test = s.query(KEYWORDS).filter_by(key=k).all()
-			if not test:
-				new = KEYWORDS(k)
-				s.add(new)
-		s.commit()
+    def add_keys(session=s, keywords = [], hashtags=[]):
+        """
+        Ajoute des mots clés à rechercher
+        """
+        for h in hashtags:
+            h = h.replace("#","")
+            h = "%23"+h
+            keywords.append(h)
+
+        for k in keywords:
+            test = s.query(KEYWORDS).filter_by(key=k).all()
+            if not test:
+                new = KEYWORDS(k)
+                s.add(new)
+        s.commit()
 
 def main():
-	pass
-	#On défini la liste des mots clés à traiter
+    pass
+    #On défini la liste des mots clés à traiter
 
-	#On lance la collecte
+    #On lance la collecte
 
-	#ON récupère les infos et on les mets dans le format attendu
+    #ON récupère les infos et on les mets dans le format attendu
 
-	#On créé les objets correspondants
+    #On créé les objets correspondants
 
 
 if __name__ == '__main__':
-	main()
+    main()

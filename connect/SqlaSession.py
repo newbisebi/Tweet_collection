@@ -19,37 +19,37 @@ def arguments():
     return parser.parse_args()
 
 class ConnectSQLAlchemy:
-	"""
-	Return objects used to interact with database
-	"""
-	def __init__(self):
-		self.Base = declarative_base()
-		self.database_name = "data"
+    """
+    Return objects used to interact with database
+    """
+    def __init__(self):
+        self.Base = declarative_base()
+        self.database_name = "data"
 
-	def path_to_database(self, database_name):
-		directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-		bdd_file = os.path.join(directory, "data",database_name)
-		bdd_file = "sqlite:///"+bdd_file+".sqlite"
-		return bdd_file
+    def path_to_database(self, database_name):
+        directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        bdd_file = os.path.join(directory, "data",database_name)
+        bdd_file = "sqlite:///"+bdd_file+".sqlite"
+        return bdd_file
 
-	@property
-	def session(self):
-		if arguments().datafile_name:
-			bdd_file = self.path_to_database(arguments().datafile_name)
-		else:
-			bdd_file = self.path_to_database(self.database_name)
-		engine = sqlalchemy.create_engine(bdd_file, echo=False)
-		Session = sqlalchemy.orm.sessionmaker(bind=engine)
-		sess = Session()  
-		self.Base.metadata.create_all(engine)
-		return sess
+    @property
+    def session(self):
+        if arguments().datafile_name:
+            bdd_file = self.path_to_database(arguments().datafile_name)
+        else:
+            bdd_file = self.path_to_database(self.database_name)
+        engine = sqlalchemy.create_engine(bdd_file, echo=False)
+        Session = sqlalchemy.orm.sessionmaker(bind=engine)
+        sess = Session()
+        self.Base.metadata.create_all(engine)
+        return sess
 
 def main():
-	conn = ConnectSQLAlchemy()
-	session = conn.session
-	Base = conn.Base
-	return session, Base
+    conn = ConnectSQLAlchemy()
+    session = conn.session
+    Base = conn.Base
+    return session, Base
 
 
 if __name__ == '__main__':
-	print(main())
+    print(main())
