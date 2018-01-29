@@ -85,8 +85,8 @@ class Database:
         """
         Get the newest and oldest tweet already collected for a given keyword
         """
-        max_id = self.session.query(func.max(Tweets.tweet_id)).filter_by(query=key).one()
-        min_id = self.session.query(func.min(Tweets.tweet_id)).filter_by(query=key).one()
+        max_id = self.session.query(func.max(Tweets.tweet_id)).filter_by(query=key).one()[0]
+        min_id = self.session.query(func.min(Tweets.tweet_id)).filter_by(query=key).one()[0]
         return min_id, max_id
 
     def increment_nb_query(self, key):
@@ -114,25 +114,31 @@ class Database:
             lg.info("Searching for keyword %s ; loop number %s", key, i)
             try:
                 if oldest_tweets is True:
+                    if min_id:
+                        min_id -= 1
                     res = api.search(q=key,
                                      count=100,
                                      result_type="recent",
-                                     max_id=min_id-1,
+                                     max_id=min_id,
                                      include_entities=True,
                                      tweet_mode='extended')
                 else:
+                    if max_id:
+                        max_id += 1
                     res = api.search(q=key,
                                      count=100,
                                      result_type="recent",
-                                     since_id=max_id+1,
+                                     since_id=max_id,
                                      include_entities=True,
                                      tweet_mode='extended')
                 if res['statuses']: #case where there are some results to write in database
                     lg.info("Number of tweets : %s", len(res['statuses']))
-                    min_id = min([tweet['id]'] for tweet in res['statuses']])
+                    min_id = min([tweet['id'] for tweet in res['statuses']])-1
                     lg.debug("min_id : %s", min_id)
 
+                    #Formatting and writing data
                     tweet_data, user_data = self.formatting(res, key)
+                    self.write_data(tweet_data, user_data)
 
                     keep_looking = True #still results so moving to next loop
                     oldest_tweets = True #then we search tweet oldest than those just collected
@@ -162,9 +168,9 @@ class Database:
 
             date = tw["created_at"]
             date1 = datetime.strptime(date, '%a %b %d %H:%M:%S +0000 %Y')
-            tweet_data['date'] = date1.strftime('%Y-%m-%d').decode('utf-8')
-            tweet_data['month'] = date1.strftime('%m').decode('utf-8')
-            tweet_data['year'] = date1.strftime('%Y').decode('utf-8')
+            tweet_data['date'] = date1.strftime('%Y-%m-%d')
+            tweet_data['month'] = date1.strftime('%m')
+            tweet_data['year'] = date1.strftime('%Y')
 
             tweet_data['truncated'] = tw["truncated"]
             tweet_data['urls'] = ','.join([url["expanded_url"] for url in tw["entities"]["urls"]])
@@ -220,7 +226,7 @@ class Database:
 
         return tweet_data, user_data
 
-    def write_data(self, user_data, tweet_data):
+    def write_data(self, tweet_data, user_data):
         """
         Writing data for users and tweets into dabase
         """
@@ -239,7 +245,10 @@ class Database:
             lg.info("Adding tweet %s", tweet_id)
         self.session.commit()
 
-def main():
+def launch_program():
+    """
+    Successive operations to run the program
+    """
     #Creating / connecting to Bdd
     db = Database(filename='twitter_data')
 
@@ -255,8 +264,5 @@ def main():
     for key in db.active_keywords:
         db.launch_query(key, oldest_tweets=False)
 
-
-
-
 if __name__ == '__main__':
-    main()
+    launch_program()

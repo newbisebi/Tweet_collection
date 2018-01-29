@@ -60,7 +60,6 @@ class Users(Base):
     def __repr__(self):
         return "<User : {} - {}>".format(self.user_id, self.user_name)
 
-
 class Tweets(Base):
     __tablename__ = u'Tweets'
     tweet_id = Column(Integer, primary_key=True)
@@ -118,4 +117,5 @@ class Tweets(Base):
         self.media_nb = tweet_data['media_nb']
         self.json_output = tweet_data['json_output']
 
-
+    def __repr__(self):
+        return "<Tweet : {} - date : {}>".format(self.tweet_id, self.date)
