@@ -8,22 +8,19 @@ import os
 import re
 import time
 from datetime import datetime #date et heure
-import logging as lg
 import sqlalchemy
 from sqlalchemy import func
 from twython import TwythonRateLimitError
+from Modules.logger import logger
+from Modules import TwitterApi
 from TablesBdd.Tables import KeyWords, Tweets, Users, Base
-from connect import TwitterApi
 
-lg.basicConfig(level=lg.INFO)
 api = TwitterApi.main()
 
 class Database:
     """
     Database to store data from Twitter
     """
-
-
     def __init__(self, filename='twitter_data'): #default database name = data
         self.name = filename
         directory = os.path.dirname(os.path.abspath(__file__))
@@ -47,11 +44,11 @@ class Database:
             if not key_already_exists.all():
                 new = KeyWords(key)
                 self.session.add(new)
-                lg.info("New keyword added to the table 'keywords' : '%s'", key)
+                logger.info("New keyword added to the table 'keywords' : '%s'", key)
             elif key_already_exists.one().active is False:
                 key_to_reactivate = key_already_exists.one()
                 key_to_reactivate.active = True
-                lg.info("Key '%s' status passed to 'active'", key)
+                logger.info("Key '%s' status passed to 'active'", key)
         self.session.commit()
 
     def get_kw(self):
@@ -79,7 +76,7 @@ class Database:
                 key_to_desactivate = self.session.query(KeyWords).filter_by(key=key).one()
                 key_to_desactivate.active = False
                 self.session.commit()
-                lg.info("Key %s status passed to 'inactive'", key)
+                logger.info("Key %s status passed to 'inactive'", key)
 
     def get_limits(self, key):
         """
@@ -104,14 +101,14 @@ class Database:
         or on the contrary, more recent tweets.
         the oldest mode enables user to get tweets from the past week.
         """
-        lg.info('Searching tweets for keywords %s', key)
+        logger.info('Searching tweets for keywords %s', key)
         min_id, max_id = self.get_limits(key)
 
         keep_looking = True
         i = 0
         while keep_looking:
             i += 1
-            lg.info("Searching for keyword %s ; loop number %s", key, i)
+            logger.info("Searching for keyword %s ; loop number %s", key, i)
             try:
                 if oldest_tweets is True:
                     if min_id:
@@ -132,30 +129,31 @@ class Database:
                                      include_entities=True,
                                      tweet_mode='extended')
                 if res['statuses']: #case where there are some results to write in database
-                    lg.info("Number of tweets : %s", len(res['statuses']))
+                    logger.info("Number of tweets : %s", len(res['statuses']))
                     min_id = min([tweet['id'] for tweet in res['statuses']])-1
-                    lg.debug("min_id : %s", min_id)
+                    logger.debug("min_id : %s", min_id)
 
                     #Formatting and writing data
-                    tweet_data, user_data = self.formatting(res, key)
-                    self.write_data(tweet_data, user_data)
+                    self.write_data(res, key)
+
 
                     keep_looking = True #still results so moving to next loop
                     oldest_tweets = True #then we search tweet oldest than those just collected
                 else:
-                    lg.info("No more results for keyword '%s' ; moving to next keyword", key)
+                    logger.info("No more results for keyword '%s' ; moving to next keyword", key)
                     keep_looking = False
 
             except TwythonRateLimitError:
-                lg.warning("Twitter limit reached. Waiting 15 minutes before moving to next keyword")
+                logger.warning("Twitter limit reached. Waiting 15 minutes before moving to next keyword")
                 time.sleep(900)
                 break
             self.increment_nb_query(key)
 
-    def formatting(self, res, key):
+    def write_data(self, res, key):
         """
         Get data from Twitter and reorganize into two dictionnary,
         one to be passed as argument for class Tweets, and the other for class Users
+        Then write data in DB using these dics
         """
         tweet_data = {}
         user_data = {}
@@ -224,26 +222,20 @@ class Database:
             user_data['user_timezone'] = tw["user"]["time_zone"]
             user_data['user_friends_count'] = tw['user']['friends_count']
 
-        return tweet_data, user_data
+            #Writing User data :
+            user = self.session.query(Users).filter_by(user_id=user_data['user_id'])
+            if not user.all():
+                new = Users(user_data)
+                self.session.add(new)
 
-    def write_data(self, tweet_data, user_data):
-        """
-        Writing data for users and tweets into dabase
-        """
-        #User data :
-        user = self.session.query(Users).filter_by(user_id=user_data['user_id'])
-        if not user.all():
-            new = Users(user_data)
-            self.session.add(new)
-
-        #Tweet_data :
-        tweet_id = tweet_data['tweet_id']
-        tweet = self.session.query(Tweets.tweet_id).filter_by(tweet_id=tweet_id).all()
-        if not tweet:
-            new = Tweets(tweet_data)
-            self.session.add(new)
-            lg.info("Adding tweet %s", tweet_id)
-        self.session.commit()
+            #Wrinting Tweet_data :
+            tweet_id = tweet_data['tweet_id']
+            tweet = self.session.query(Tweets.tweet_id).filter_by(tweet_id=tweet_id).all()
+            if not tweet:
+                new = Tweets(tweet_data)
+                self.session.add(new)
+                logger.info("Adding tweet %s", tweet_id)
+            self.session.commit()
 
 def launch_program():
     """

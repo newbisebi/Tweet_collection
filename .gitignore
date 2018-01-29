@@ -1,3 +1,4 @@
 AuthTwitterCodes.txt
 _old/
-data/
+data/log.log
+data/twitter_data.sqlite
