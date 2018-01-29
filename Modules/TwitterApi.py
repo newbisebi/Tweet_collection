@@ -6,7 +6,6 @@ return an api object
 #! /usr/bin/env python3
 # coding: utf-8
 
-import argparse
 import os
 import logging as lg
 from twython import Twython #interface avec Twitter
@@ -15,14 +14,7 @@ lg.basicConfig(level=lg.INFO)
 #import pdb; pdb.set_trace()
 
 
-def arguments():
-    """
-    Define arguments passed in console
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-t', '--twittercodes', help="""Enter the 4 keys for authenticating into Twitter API, separated by comma, no space""")
-    parser.add_argument('-f', '--codes_filename', help="""Enter the name of the txt file with API keys (4 lines)""")
-    return parser.parse_args()
+
 
 class AuthTwitter:
     """
@@ -34,20 +26,11 @@ class AuthTwitter:
         """
         self.api_codes = api_codes
 
-    def code_file_param(self, args):
-        """
-        Read api keys passed as parameters
-        """
-        self.api_codes = args.twittercodes.split(',')
-
-    def open_codes_file(self, args):
+    def open_codes_file(self):
         """
         Read the file containing the api_codes
         """
-        if not args.codes_filename:
-            twitter_codes_filename = 'AuthTwitterCodes.txt'
-        else:
-            twitter_codes_filename = args.codes_filename
+        twitter_codes_filename = 'AuthTwitterCodes.txt'
 
         directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         twitter_codes_file = os.path.join(directory, twitter_codes_filename)
@@ -64,19 +47,16 @@ class AuthTwitter:
                        oauth_token=self.api_codes[2],
                        oauth_token_secret=self.api_codes[3])
 
-def main():
+def connect():
     """
     Main operations
     """
-    args = arguments()
     auth = AuthTwitter()
-    if arguments().twittercodes is not None:
-        auth.code_file_param(args)
-    else:
-        try:
-            auth.open_codes_file(args)
-        except FileNotFoundError:
-            lg.critical("Authentifications codes expected. Please enter codes as parameters or create a file with a line for each key ('app_key, app_secret, oauth_token, oauth_token_secret'")
+
+    try:
+        auth.open_codes_file()
+    except FileNotFoundError:
+        lg.critical("########### Authentifications codes expected. Please enter codes as parameters or create a file with a line for each key ('app_key, app_secret, oauth_token, oauth_token_secret' ###########")
     if auth.api_codes:
         api = auth.connect()
         lg.info("Connexion à l'API effectuée")
@@ -85,5 +65,5 @@ def main():
     return api
 
 if __name__ == '__main__':
-    API = main()
+    API = connect()
     print(API)

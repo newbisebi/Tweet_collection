@@ -6,6 +6,7 @@ Collects tweets by keywords
 # coding: utf-8
 import os
 import re
+import argparse
 import time
 from datetime import datetime #date et heure
 import sqlalchemy
@@ -15,7 +16,16 @@ from Modules.logger import logger
 from Modules import TwitterApi
 from TablesBdd.Tables import KeyWords, Tweets, Users, Base
 
-api = TwitterApi.main()
+api = TwitterApi.connect()
+
+def arguments():
+    """
+    Define arguments passed in console
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-o', '--older', action='store_true', help="""Set parameter if you want to get tweets older than those already in the database""")
+    return parser.parse_args()
+
 
 class Database:
     """
@@ -94,7 +104,7 @@ class Database:
         key_upd.nb_query += 1
         self.session.commit()
 
-    def launch_query(self, key, oldest_tweets=False):
+    def launch_query(self, key, older_tweets=False):
         """
         Look up tweets corresponding to a given keyword
         Can search for oldest tweet than those previously collected
@@ -110,7 +120,7 @@ class Database:
             i += 1
             logger.info("Searching for keyword %s ; loop number %s", key, i)
             try:
-                if oldest_tweets is True:
+                if older_tweets is True:
                     if min_id:
                         min_id -= 1
                     res = api.search(q=key,
@@ -138,7 +148,7 @@ class Database:
 
 
                     keep_looking = True #still results so moving to next loop
-                    oldest_tweets = True #then we search tweet oldest than those just collected
+                    older_tweets = True #then we search tweet oldest than those just collected
                 else:
                     logger.info("No more results for keyword '%s' ; moving to next keyword", key)
                     keep_looking = False
@@ -245,16 +255,24 @@ def launch_program():
     db = Database(filename='twitter_data')
 
     #Updating keywords list
-    with open('keywords.txt') as keywords_file:
-        keywords = ''.join(keywords_file.readlines()).replace(' ', '').split(',')
-    db.add_keywords(keywords)
-    db.get_kw()
-    db.desactivate_keywords(keywords)
-    db.get_kw() #Repeat this line to eliminate recently desactivated keys from query list
+    try:
+        with open('keywords.txt') as keywords_file:
+            keywords = ''.join(keywords_file.readlines()).replace(' ', '').split(',')
+        db.add_keywords(keywords)
+        db.get_kw()
+        db.desactivate_keywords(keywords)
+        db.get_kw() #Repeat this line to eliminate recently desactivated keys from query list
+    except FileNotFoundError:
+        logger.warning("File keywords.txt not found : no keyword added to database")
+        db.get_kw()
 
     #Tweets Collection
+    logger.info('Starting collection')
+    args = arguments()
+    older_tweets = args.older
+    logger.info("Argument 'older_tweets set as : %s",older_tweets)
     for key in db.active_keywords:
-        db.launch_query(key, oldest_tweets=False)
+        db.launch_query(key, older_tweets)
 
 if __name__ == '__main__':
     launch_program()
