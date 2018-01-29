@@ -2,3 +2,4 @@ AuthTwitterCodes.txt
 _old/
 data/log.log
 data/twitter_data.sqlite
+env_projet_twitter/
