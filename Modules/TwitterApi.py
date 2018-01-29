@@ -9,61 +9,59 @@ return an api object
 import os
 import logging as lg
 from twython import Twython #interface avec Twitter
+from twython import TwythonAuthError
 
 lg.basicConfig(level=lg.INFO)
 #import pdb; pdb.set_trace()
 
-
-
-
-class AuthTwitter:
+def create_file():
     """
-    Authentification to the Twitter API
+    Create a file with identifications keys to connect to Twitter API
+    File must be completed by user before lauching tweet collection
     """
-    def __init__(self, api_codes=None):
-        """
-        API Codes in the following order : app_key, app_secret, oauth_token, oauth_token_secret
-        """
-        self.api_codes = api_codes
+    directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    twitter_codes_file = os.path.join(directory, 'AuthTwitterCodes.txt')
+    with open(twitter_codes_file, "w") as code_file:
+        code_file.write("""Replace this line with app_key\nReplace this line with app_secret\nReplace this line with oauth_token\nReplace this line with oauth_token_secret""")
 
-    def open_codes_file(self):
-        """
-        Read the file containing the api_codes
-        """
-        twitter_codes_filename = 'AuthTwitterCodes.txt'
 
-        directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        twitter_codes_file = os.path.join(directory, twitter_codes_filename)
-        #import pdb; pdb.set_trace()
-        with open(twitter_codes_file) as code_file:
-            self.api_codes = [line.strip() for line in code_file.readlines()]
+def open_codes_file():
+    """
+    Read the file containing the api_codes
+    """
+    directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    twitter_codes_file = os.path.join(directory, 'AuthTwitterCodes.txt')
+    #import pdb; pdb.set_trace()
+    with open(twitter_codes_file) as code_file:
+        api_codes = [line.strip() for line in code_file.readlines()]
+    return api_codes
 
-    def connect(self):
-        """
-        Log in to the API
-        """
-        return Twython(app_key=self.api_codes[0],
-                       app_secret=self.api_codes[1],
-                       oauth_token=self.api_codes[2],
-                       oauth_token_secret=self.api_codes[3])
+def log_in_to_api(api_codes):
+    """
+    Log in to the API
+    """
+    return Twython(app_key=api_codes[0],
+                   app_secret=api_codes[1],
+                   oauth_token=api_codes[2],
+                   oauth_token_secret=api_codes[3])
 
 def connect():
     """
     Main operations
     """
-    auth = AuthTwitter()
-
     try:
-        auth.open_codes_file()
-    except FileNotFoundError:
-        lg.critical("########### Authentifications codes expected. Please enter codes as parameters or create a file with a line for each key ('app_key, app_secret, oauth_token, oauth_token_secret' ###########")
-    if auth.api_codes:
-        api = auth.connect()
+        api_codes = open_codes_file()
+        api = log_in_to_api(api_codes)
         lg.info("Connexion à l'API effectuée")
-    else:
-        api = None
+    except TwythonAuthError:
+        lg.critical("Authentification failed, please verify credentials")
+        raise SystemExit
+    except FileNotFoundError:
+        lg.critical("########### Authentifications codes expected. Please complete the file 'AuthTwitterCodes.txt' at project root with login keys: ('app_key, app_secret, oauth_token, oauth_token_secret' ###########")
+        create_file()
+        raise SystemExit
+
     return api
 
 if __name__ == '__main__':
-    API = connect()
-    print(API)
+    pass

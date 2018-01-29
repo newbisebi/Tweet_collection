@@ -8,12 +8,12 @@ Create a file "AuthTwitterCodes.txt" at project root with 4 lines corresponding 
 No space, no comma.
 
 ### Search keywords
-In the file keywords.txt, indicate words or hashtags you want to search for in Twitter.
+In the file keywords.txt, indicate words or hashtags you want to search in Twitter.
 All keywords on the same line, separated by comma
 
 ### Search parameters
 the following options can be passed :
--o (--older) :  if argument passed, search for tweets older than those already stored in Database. Otherwise, the program get tweets more recent.
+-o (--older) :  if argument passed, search for tweets older than those already stored in Database. Otherwise, the program gets the latest tweets.
 
 
 ##To do

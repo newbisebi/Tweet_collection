@@ -16,7 +16,7 @@ from Modules.logger import logger
 from Modules import TwitterApi
 from TablesBdd.Tables import KeyWords, Tweets, Users, Base
 
-api = TwitterApi.connect()
+
 
 def arguments():
     """
@@ -25,7 +25,6 @@ def arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--older', action='store_true', help="""Set parameter if you want to get tweets older than those already in the database""")
     return parser.parse_args()
-
 
 class Database:
     """
@@ -104,7 +103,7 @@ class Database:
         key_upd.nb_query += 1
         self.session.commit()
 
-    def launch_query(self, key, older_tweets=False):
+    def launch_query(self, key, api, older_tweets=False):
         """
         Look up tweets corresponding to a given keyword
         Can search for oldest tweet than those previously collected
@@ -252,6 +251,11 @@ def launch_program():
     Successive operations to run the program
     """
     #Creating / connecting to Bdd
+    api = TwitterApi.connect()
+    if not api:
+        logger.critical('Connexion to API impossible. Program over.')
+        raise SystemExit
+
     db = Database(filename='twitter_data')
 
     #Updating keywords list
@@ -272,7 +276,7 @@ def launch_program():
     older_tweets = args.older
     logger.info("Argument 'older_tweets set as : %s",older_tweets)
     for key in db.active_keywords:
-        db.launch_query(key, older_tweets)
+        db.launch_query(key, api, older_tweets)
 
 if __name__ == '__main__':
     launch_program()
