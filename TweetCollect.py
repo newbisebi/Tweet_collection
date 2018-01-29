@@ -6,9 +6,12 @@ Collects tweets by keywords
 # coding: utf-8
 import os
 import re
+import time
+from datetime import datetime #date et heure
 import logging as lg
 import sqlalchemy
 from sqlalchemy import func
+from twython import TwythonRateLimitError
 from TablesBdd.Tables import KeyWords, Tweets, Users, Base
 from connect import TwitterApi
 
@@ -86,17 +89,31 @@ class Database:
         min_id = self.session.query(func.min(Tweets.tweet_id)).filter_by(query=key).one()
         return min_id, max_id
 
-    def query_api(self, key, oldest_tweets=True):
+    def increment_nb_query(self, key):
+        """
+        Add 1  to the number of query realized for a given keyword
+        """
+        key_upd = self.session.query(KeyWords).filter_by(key=key).one()
+        key_upd.nb_query += 1
+        self.session.commit()
+
+    def launch_query(self, key, oldest_tweets=False):
+        """
+        Look up tweets corresponding to a given keyword
+        Can search for oldest tweet than those previously collected
+        or on the contrary, more recent tweets.
+        the oldest mode enables user to get tweets from the past week.
+        """
         lg.info('Searching tweets for keywords %s', key)
         min_id, max_id = self.get_limits(key)
 
-        continu = True
-        i=0
-        while continu:
-            i+=1
-            lg.info("Recherche pour le mot clé %s : recherche numéro %s", key, i)
+        keep_looking = True
+        i = 0
+        while keep_looking:
+            i += 1
+            lg.info("Searching for keyword %s ; loop number %s", key, i)
             try:
-                if oldest_tweets == True:
+                if oldest_tweets is True:
                     res = api.search(q=key,
                                      count=100,
                                      result_type="recent",
@@ -110,25 +127,117 @@ class Database:
                                      since_id=max_id+1,
                                      include_entities=True,
                                      tweet_mode='extended')
-                if res['statuses']:
-                    lg.info("Nombre de tweets : %s", len(res['statuses']))
-                    min_id = enregistrement(res, key)
-                    continu = True
-                    oldest_tweets = True
+                if res['statuses']: #case where there are some results to write in database
+                    lg.info("Number of tweets : %s", len(res['statuses']))
+                    min_id = min([tweet['id]'] for tweet in res['statuses']])
                     lg.debug("min_id : %s", min_id)
+
+                    tweet_data, user_data = self.formatting(res, key)
+
+                    keep_looking = True #still results so moving to next loop
+                    oldest_tweets = True #then we search tweet oldest than those just collected
                 else:
-                    lg.info("Plus de résultat pour le mot clé '%s' ; passage au mot clé suivant", key)
-                    continu = False
+                    lg.info("No more results for keyword '%s' ; moving to next keyword", key)
+                    keep_looking = False
 
             except TwythonRateLimitError:
                 lg.warning("Twitter limit reached. Waiting 15 minutes before moving to next keyword")
                 time.sleep(900)
                 break
+            self.increment_nb_query(key)
 
-            #######  UPDATE NUMBER OF QUERIES FOR A KEYWORD ######
-            key_upd = s.query(KEYWORDS).filter_by(key = k).one()
-            key_upd.nb_query += 1
-            s.commit()
+    def formatting(self, res, key):
+        """
+        Get data from Twitter and reorganize into two dictionnary,
+        one to be passed as argument for class Tweets, and the other for class Users
+        """
+        tweet_data = {}
+        user_data = {}
+
+        tweet_data['query'] = key
+        #min_id = None
+        for tw in res['statuses']:
+            #tweets data
+            tweet_data['tweet_id'] = tw["id"]
+
+            date = tw["created_at"]
+            date1 = datetime.strptime(date, '%a %b %d %H:%M:%S +0000 %Y')
+            tweet_data['date'] = date1.strftime('%Y-%m-%d').decode('utf-8')
+            tweet_data['month'] = date1.strftime('%m').decode('utf-8')
+            tweet_data['year'] = date1.strftime('%Y').decode('utf-8')
+
+            tweet_data['truncated'] = tw["truncated"]
+            tweet_data['urls'] = ','.join([url["expanded_url"] for url in tw["entities"]["urls"]])
+            tweet_data['hashtags'] = ','.join([ht["text"] for ht in tw["entities"]["hashtags"]])
+            tweet_data['user_mentions_name'] = ','.join(
+                [user["screen_name"] for user in tw["entities"]["user_mentions"]])
+            tweet_data['user_mentions_id'] = ','.join(
+                [str(user["id"]) for user in tw["entities"]["user_mentions"]])
+            tweet_data['text'] = tw["full_text"]
+            tweet_data['language'] = tw["lang"]
+            if tw['place']:
+                tweet_data['place'] = tw['place']['name'] + ", "+tw['place']['country']
+            else:
+                tweet_data['place'] = None
+            if "possibly_sensitive" in tw:
+                tweet_data['sensitive'] = tw["possibly_sensitive"]
+            else:
+                tweet_data['sensitive'] = False
+            tweet_data['reply_to_tw'] = tw["in_reply_to_status_id"]
+            tweet_data['reply_to_user'] = tw["in_reply_to_user_id"]
+            tweet_data['reply_to_user_name'] = tw["in_reply_to_screen_name"]
+            tweet_data['is_rt'] = bool('retweeted_status' in tw)
+
+            tweet_data['source_tw'] = tw["source"]
+            if "extended_entities" in tw:
+                tweet_data['media_type'] = ','.join(
+                    [media["type"] for media in tw["extended_entities"]["media"]])
+                tweet_data['media_url'] = ','.join(
+                    [media["media_url"] for media in tw["extended_entities"]["media"]])
+                tweet_data['media_nb'] = len(tw["extended_entities"]["media"])
+            else:
+                tweet_data['media_type'] = None
+                tweet_data['media_url'] = None
+                tweet_data['media_nb'] = None
+
+            tweet_data['json_output'] = str(tw)
+
+             #Shared data
+            tweet_data['user_id'] = tw["user"]["id"]
+            tweet_data['user_name'] = tw["user"]["name"]
+            user_data['user_id'] = tw["user"]["id"]
+            user_data['user_name'] = tw["user"]["name"]
+
+            #User specific data
+            user_data['user_screen_name'] = tw["user"]["screen_name"]
+            user_data['user_location'] = tw["user"]["location"]
+            user_data['user_descr'] = tw["user"]["description"]
+            user_data['user_lang'] = tw["user"]["lang"]
+            user_data['user_followers_count'] = tw["user"]["followers_count"]
+            user_data['user_verified'] = tw["user"]["verified"]
+            user_data['user_timezone'] = tw["user"]["time_zone"]
+            user_data['user_friends_count'] = tw['user']['friends_count']
+
+        return tweet_data, user_data
+
+    def write_data(self, user_data, tweet_data):
+        """
+        Writing data for users and tweets into dabase
+        """
+        #User data :
+        user = self.session.query(Users).filter_by(user_id=user_data['user_id'])
+        if not user.all():
+            new = Users(user_data)
+            self.session.add(new)
+
+        #Tweet_data :
+        tweet_id = tweet_data['tweet_id']
+        tweet = self.session.query(Tweets.tweet_id).filter_by(tweet_id=tweet_id).all()
+        if not tweet:
+            new = Tweets(tweet_data)
+            self.session.add(new)
+            lg.info("Adding tweet %s", tweet_id)
+        self.session.commit()
 
 def main():
     #Creating / connecting to Bdd
@@ -144,7 +253,7 @@ def main():
 
     #Tweets Collection
     for key in db.active_keywords:
-        db.query_api(key)
+        db.launch_query(key, oldest_tweets=False)
 
 
 

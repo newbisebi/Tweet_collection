@@ -5,6 +5,7 @@ Collects tweets by keywords
 #! /usr/bin/env python3
 # coding: utf-8
 
+import time
 from sqlalchemy import Column, Integer, String, Boolean#, ForeignKey, Text, DateTime, Float
 from sqlalchemy.ext.declarative import declarative_base
 
